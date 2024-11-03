@@ -283,59 +283,57 @@
 
         function processProductOrService(prettyJsonText, previousResults) {
             try {
-                // Parse the JSON text into an object
                 var jsonObj = JSON.parse(prettyJsonText);
                 
-                // Check if the JSON object contains services in an array format
-                var services = Array.isArray(jsonObj) ? jsonObj : [jsonObj];
                 var serviceResults = '';
+                
+                // Loop through each service entry in `productOrService`
+                if (jsonObj.productOrService) {
+                    var productOrService = jsonObj.productOrService;
 
-                services.forEach((service, index) => {
-                    var display = service.display || 'Not found';
-                    var nphiesCode = service.coding?.[0]?.code || 'Not found';
-                    var serviceCode = service.coding?.[1]?.code || 'Not found';
-                    var patientInvoice = service.patientInvoice?.value || 'Not found';
+                    // Extract coding, unitPrice, net, servicedDate, and quantity directly from productOrService
+                    var nphiesCode = productOrService.coding && productOrService.coding[0] ? productOrService.coding[0].code : 'Not found';
+                    var serviceCode = productOrService.coding && productOrService.coding[1] ? productOrService.coding[1].code : 'Not found';
+                    var display = productOrService.coding && productOrService.coding[0] ? productOrService.coding[0].display : 'Not found';
+                    var servicedDate = jsonObj.servicedDate || 'Not found';
+                    var quantity = jsonObj.quantity && jsonObj.quantity.value ? jsonObj.quantity.value : 'Not found';
+                    var unitPrice = jsonObj.unitPrice && jsonObj.unitPrice.value ? jsonObj.unitPrice.value : 'Not found';
+                    var net = jsonObj.net && jsonObj.net.value ? jsonObj.net.value : 'Not found';
 
-                    // Extract extension-tax
+                    // Extension fields extraction
                     var extensionTax = 'Not found';
-                    var extension = service.extension || [];
-                    extension.forEach(ext => {
-                        if (ext.url && ext.url.includes("extension-tax")) {
-                            extensionTax = ext.valueMoney?.value || 'Not found';
-                        }
-                    });
-
-                    // Extract patient-share
                     var patientShare = 'Not found';
-                    extension.forEach(ext => {
-                        if (ext.url && ext.url.includes("patient-share")) {
-                            patientShare = ext.valueMoney?.value || 'Not found';
-                        }
-                    });
+                    var patientInvoice = 'Not found';
 
-                    // Extract net
-                    var net = service.net?.value || 'Not found';
+                    if (jsonObj.extension && Array.isArray(jsonObj.extension)) {
+                        jsonObj.extension.forEach(ext => {
+                            if (ext.url && ext.url.includes("extension-tax")) {
+                                extensionTax = ext.valueMoney && ext.valueMoney.value ? ext.valueMoney.value : 'Not found';
+                            }
+                            if (ext.url && ext.url.includes("extension-patient-share")) {
+                                patientShare = ext.valueMoney && ext.valueMoney.value ? ext.valueMoney.value : 'Not found';
+                            }
+                            if (ext.url && ext.url.includes("extension-patientInvoice")) {
+                                patientInvoice = ext.valueIdentifier && ext.valueIdentifier.value ? ext.valueIdentifier.value : 'Not found';
+                            }
+                        });
+                    }
 
-                    // Extract unitPrice
-                    var unitPrice = service.unitPrice?.value || 'Not found';
-
-                    // Extract servicedDate and quantity
-                    var servicedDate = service.servicedDate || 'Not found';
-                    var quantity = service.quantity?.value || 'Not found';
-
-                    // Compile all extracted information into a single package for each service
-                    serviceResults += `<br>Product/Service ${index + 1} <br>`;
+                    // Compile the information for display
+                    serviceResults += `<br>Product/Service <br>`;
                     serviceResults += `Name: ${display}<br>`;
                     serviceResults += `Nphies Code: ${nphiesCode}<br>`;
                     serviceResults += `Service Code: ${serviceCode}<br>`;
-                    serviceResults += `Patient Invoice: ${patientInvoice}<br>`;
+                    serviceResults += `Serviced Date: ${servicedDate}<br>`;
+                    serviceResults += `Quantity: ${quantity}<br>`;
+                    serviceResults += `Unit Price: ${unitPrice}<br>`;
+                    serviceResults += `Net: ${net}<br>`;
                     serviceResults += `Extension Tax: ${extensionTax}<br>`;
                     serviceResults += `Patient Share: ${patientShare}<br>`;
-                    serviceResults += `Net: ${net}<br>`;
-                    serviceResults += `Unit Price: ${unitPrice}<br>`;
-                    serviceResults += `Serviced Date: ${servicedDate}<br>`;
-                    serviceResults += `Quantity: ${quantity}<br><br>`;
-                });
+                    serviceResults += `Patient Invoice: ${patientInvoice}<br><br>`;
+                } else {
+                    serviceResults = 'No productOrService found in JSON data.';
+                }
 
                 document.getElementById('outputBox').innerHTML = previousResults + serviceResults;
 
@@ -343,6 +341,7 @@
                 document.getElementById('outputBox').innerHTML = 'Error parsing JSON: ' + e.message;
             }
         }
+
 
 
 
