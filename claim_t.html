@@ -280,14 +280,14 @@
 
             processProductOrService(prettyJsonText, results);
         }
-            // Helper function for extracting values from the extension array
-        function extractFromExtension(prettyJsonText, urlPattern) {
-            var regexPattern = `"url":\\s*"${urlPattern}"[\\s\\S]*?"value(?:Money|Identifier)?"?:\\s*{\\s*"value":\\s*([\\d.]+)`;
-            var match = prettyJsonText.match(new RegExp(regexPattern, 'i'));
-            return match ? match[1] : 'Not found';
-        }
-
         function processProductOrService(prettyJsonText, previousResults) {
+            // Inner function for extracting values from the extension array
+            function extractFromExtension(prettyJsonText, urlPattern) {
+                var regexPattern = `"url":\\s*"${urlPattern}"[\\s\\S]*?"value(?:Money|Identifier)?"?:\\s*{\\s*"value":\\s*([\\d.]+)`;
+                var match = prettyJsonText.match(new RegExp(regexPattern, 'i'));
+                return match ? match[1] : 'Not found';
+            }
+
             // Pattern to match the main `productOrService` section
             var servicePattern = '"productOrService":\\s*{[\\s\\S]+?},[\\s\\S]*?"quantity":\\s*{\\s*"value":\\s*(\\d+)';
             var serviceResults = '';
