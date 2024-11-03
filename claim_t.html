@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON Extractor</title>
     <style>
         body {
-            background-color: #f4f4f9;
-            color: #333;
+            background-image: url('back.png');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: white;
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
@@ -16,49 +17,92 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-top: 50px;
-            width: 100%;
+            justify-content: flex-start;
+            padding-top: 100px;
+            height: calc(100vh - 100px);
         }
         .title {
             font-size: 24px;
-            font-weight: bold;
             margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
         }
         .boxes {
             display: flex;
+            flex-direction: row;
             flex-wrap: wrap;
+            align-items: center;
             justify-content: center;
-            width: 100%;
+            max-width: 100%;
         }
         .box {
-            border: 2px solid #ccc;
+            border: 2px solid black;
+            background-color: white;
             margin: 10px;
             padding: 10px;
+            color: black;
             width: 300px;
-            height: 400px;
-            resize: none;
+            height: 600px;
         }
-        .output-box {
-            border: 2px solid #ccc;
+        .beuti-box {
+            background-color: #88b5e2;
+            color: black;
+            border: 2px solid black;
             margin: 10px;
             padding: 10px;
             width: 600px;
-            height: 400px;
-            overflow-y: auto;
-            background-color: #f9f9f9;
+            height: 700px;
+            overflow: auto;
+        }
+        .output-box {
+            background-color: #020100;
+            color: #8fbc8f;
+            border: 2px solid #000000;
+            margin: 10px;
+            padding: 10px;
+            width: 600px;
+            height: 700px;
+            overflow: auto;
             font-weight: bold;
         }
-        .button {
-            margin: 10px;
-            padding: 10px 20px;
+        .arrow-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
             cursor: pointer;
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 5px;
+            margin: 10px;
         }
-        .button:hover {
-            background-color: #0056b3;
+        .arrow {
+            border: 1px solid white;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+        }
+        .clear-box {
+            width: 3cm;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            color: rgb(8, 2, 2);
+            height: 80px;
+            border: 2px solid black;
+            background-color: #fdf8f8;
+            margin: 10px 0;
+        }
+        .clear-box:hover {
+            background-color: #f1efef;
+        }
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: white;
+            color: #000003;
         }
     </style>
 </head>
@@ -67,85 +111,64 @@
         <div class="title">Rules Library JSON Extractor</div>
         <div class="boxes">
             <textarea id="inputBox" class="box" placeholder="Paste your JSON text here"></textarea>
-            <div>
-                <button class="button" onclick="processProductOrService()">Extract Data</button>
-                <button class="button" onclick="clearContent()">Clear</button>
+            <div class="arrow-box" onclick="processProductOrService()">
+                <div class="arrow">&#8594;</div>
             </div>
+            <textarea id="beutiBox" class="beuti-box" readonly></textarea>
             <div id="outputBox" class="output-box"></div>
         </div>
+        <div class="clear-box" onclick="clearContent()">Clear</div>
     </div>
-
     <script>
         function processProductOrService() {
-            // Get JSON input from the textarea
             const prettyJsonText = document.getElementById('inputBox').value;
-            const previousResults = document.getElementById('outputBox').innerHTML;
+            let serviceResults = '';
+
+            function extractFromExtension(urlPattern) {
+                const regexPattern = `"url":\\s*"${urlPattern}"[\\s\\S]*?"value(?:Money|Identifier)?"?:\\s*{\\s*"value":\\s*([\\d.]+)`;
+                const match = prettyJsonText.match(new RegExp(regexPattern, 'i'));
+                return match ? match[1] : 'Not found';
+            }
 
             try {
-                // Parse the JSON text into an object
                 const jsonObj = JSON.parse(prettyJsonText);
+                const productOrService = jsonObj.productOrService;
+                const coding = productOrService?.coding || [];
+                const displayName = coding[0]?.display || 'Not found';
+                const nphiesCode = coding[0]?.code || 'Not found';
+                const serviceCode = coding[1]?.code || 'Not found';
+                const servicedDate = jsonObj.servicedDate || 'Not found';
+                const quantity = jsonObj.quantity?.value || 'Not found';
+                const unitPrice = jsonObj.unitPrice?.value || 'Not found';
+                const net = jsonObj.net?.value || 'Not found';
 
-                let serviceResults = '';
+                let extensionTax = extractFromExtension("extension-tax");
+                let patientShare = extractFromExtension("extension-patient-share");
+                let patientInvoice = extractFromExtension("extension-patientInvoice");
 
-                // Extract fields from the main `productOrService` section
-                if (jsonObj.productOrService) {
-                    const productOrService = jsonObj.productOrService;
+                serviceResults += `<br>Product/Service:<br>`;
+                serviceResults += `Name: ${displayName}<br>`;
+                serviceResults += `Nphies Code: ${nphiesCode}<br>`;
+                serviceResults += `Service Code: ${serviceCode}<br>`;
+                serviceResults += `Patient Invoice: ${patientInvoice}<br>`;
+                serviceResults += `Extension Tax: ${extensionTax}<br>`;
+                serviceResults += `Patient Share: ${patientShare}<br>`;
+                serviceResults += `Net: ${net}<br>`;
+                serviceResults += `Unit Price: ${unitPrice}<br>`;
+                serviceResults += `Serviced Date: ${servicedDate}<br>`;
+                serviceResults += `Quantity: ${quantity}<br><br>`;
 
-                    // Extract coding details (Nphies Code and Service Code)
-                    const coding = productOrService.coding || [];
-                    const nphiesCode = coding.length > 0 ? coding[0].code || 'Not found' : 'Not found';
-                    const serviceCode = coding.length > 1 ? coding[1].code || 'Not found' : 'Not found';
-                    const displayName = coding.length > 0 ? coding[0].display || 'Not found' : 'Not found';
-
-                    // Extract other direct fields
-                    const servicedDate = jsonObj.servicedDate || 'Not found';
-                    const quantity = jsonObj.quantity && jsonObj.quantity.value ? jsonObj.quantity.value : 'Not found';
-                    const unitPrice = jsonObj.unitPrice && jsonObj.unitPrice.value ? jsonObj.unitPrice.value : 'Not found';
-                    const net = jsonObj.net && jsonObj.net.value ? jsonObj.net.value : 'Not found';
-
-                    // Extract values from the `extension` array
-                    const extension = jsonObj.extension || [];
-                    let extensionTax = 'Not found';
-                    let patientShare = 'Not found';
-                    let patientInvoice = 'Not found';
-
-                    extension.forEach((ext) => {
-                        if (ext.url && ext.url.includes("extension-tax")) {
-                            extensionTax = ext.valueMoney && ext.valueMoney.value ? ext.valueMoney.value : 'Not found';
-                        }
-                        if (ext.url && ext.url.includes("extension-patient-share")) {
-                            patientShare = ext.valueMoney && ext.valueMoney.value ? ext.valueMoney.value : 'Not found';
-                        }
-                        if (ext.url && ext.url.includes("extension-patientInvoice")) {
-                            patientInvoice = ext.valueIdentifier && ext.valueIdentifier.value ? ext.valueIdentifier.value : 'Not found';
-                        }
-                    });
-
-                    // Compile all extracted information into a single package for display
-                    serviceResults += `<br>Product/Service:<br>`;
-                    serviceResults += `Name: ${displayName}<br>`;
-                    serviceResults += `Nphies Code: ${nphiesCode}<br>`;
-                    serviceResults += `Service Code: ${serviceCode}<br>`;
-                    serviceResults += `Patient Invoice: ${patientInvoice}<br>`;
-                    serviceResults += `Extension Tax: ${extensionTax}<br>`;
-                    serviceResults += `Patient Share: ${patientShare}<br>`;
-                    serviceResults += `Net: ${net}<br>`;
-                    serviceResults += `Unit Price: ${unitPrice}<br>`;
-                    serviceResults += `Serviced Date: ${servicedDate}<br>`;
-                    serviceResults += `Quantity: ${quantity}<br><br>`;
-                } else {
-                    serviceResults = 'No productOrService section found in JSON data.';
-                }
-
-                document.getElementById('outputBox').innerHTML = previousResults + serviceResults;
-
+                document.getElementById('outputBox').innerHTML = serviceResults;
+                document.getElementById('beutiBox').value = JSON.stringify(jsonObj, null, 2);
             } catch (error) {
-                document.getElementById('outputBox').innerHTML = 'Error parsing JSON: ' + error.message;
+                document.getElementById('outputBox').innerText = 'Invalid JSON: ' + error.message;
+                document.getElementById('beutiBox').value = '';
             }
         }
 
         function clearContent() {
             document.getElementById('inputBox').value = '';
+            document.getElementById('beutiBox').value = '';
             document.getElementById('outputBox').innerText = '';
         }
     </script>
