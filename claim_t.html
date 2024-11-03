@@ -111,7 +111,7 @@
         <div class="title">Rules Library JSON Extractor</div>
         <div class="boxes">
             <textarea id="inputBox" class="box" placeholder="Paste your JSON text here"></textarea>
-            <div class="arrow-box" onclick="processProductOrService()">
+            <div class="arrow-box" onclick="processJson()">
                 <div class="arrow">&#8594;</div>
             </div>
             <textarea id="beutiBox" class="beuti-box" readonly></textarea>
@@ -120,49 +120,16 @@
         <div class="clear-box" onclick="clearContent()">Clear</div>
     </div>
     <script>
-        function processProductOrService() {
-            const prettyJsonText = document.getElementById('inputBox').value;
-            let serviceResults = '';
-
-            function extractFromExtension(urlPattern) {
-                const regexPattern = `"url":\\s*"${urlPattern}"[\\s\\S]*?"value(?:Money|Identifier)?"?:\\s*{\\s*"value":\\s*([\\d.]+)`;
-                const match = prettyJsonText.match(new RegExp(regexPattern, 'i'));
-                return match ? match[1] : 'Not found';
-            }
-
+        function processJson() {
+            var inputText = document.getElementById('inputBox').value;
             try {
-                const jsonObj = JSON.parse(prettyJsonText);
-                const productOrService = jsonObj.productOrService;
-                const coding = productOrService?.coding || [];
-                const displayName = coding[0]?.display || 'Not found';
-                const nphiesCode = coding[0]?.code || 'Not found';
-                const serviceCode = coding[1]?.code || 'Not found';
-                const servicedDate = jsonObj.servicedDate || 'Not found';
-                const quantity = jsonObj.quantity?.value || 'Not found';
-                const unitPrice = jsonObj.unitPrice?.value || 'Not found';
-                const net = jsonObj.net?.value || 'Not found';
-
-                let extensionTax = extractFromExtension("extension-tax");
-                let patientShare = extractFromExtension("extension-patient-share");
-                let patientInvoice = extractFromExtension("extension-patientInvoice");
-
-                serviceResults += `<br>Product/Service:<br>`;
-                serviceResults += `Name: ${displayName}<br>`;
-                serviceResults += `Nphies Code: ${nphiesCode}<br>`;
-                serviceResults += `Service Code: ${serviceCode}<br>`;
-                serviceResults += `Patient Invoice: ${patientInvoice}<br>`;
-                serviceResults += `Extension Tax: ${extensionTax}<br>`;
-                serviceResults += `Patient Share: ${patientShare}<br>`;
-                serviceResults += `Net: ${net}<br>`;
-                serviceResults += `Unit Price: ${unitPrice}<br>`;
-                serviceResults += `Serviced Date: ${servicedDate}<br>`;
-                serviceResults += `Quantity: ${quantity}<br><br>`;
-
-                document.getElementById('outputBox').innerHTML = serviceResults;
-                document.getElementById('beutiBox').value = JSON.stringify(jsonObj, null, 2);
-            } catch (error) {
-                document.getElementById('outputBox').innerText = 'Invalid JSON: ' + error.message;
-                document.getElementById('beutiBox').value = '';
+                var jsonObj = JSON.parse(inputText);
+                var prettyJson = JSON.stringify(jsonObj, null, 2);
+                document.getElementById('beutiBox').value = prettyJson;
+                searchJson(jsonObj);
+            } catch (e) {
+                document.getElementById('beutiBox').value = 'Invalid JSON: ' + e.message;
+                document.getElementById('outputBox').innerText = '';
             }
         }
 
@@ -170,6 +137,58 @@
             document.getElementById('inputBox').value = '';
             document.getElementById('beutiBox').value = '';
             document.getElementById('outputBox').innerText = '';
+        }
+
+        function searchJson(jsonObj) {
+            var output = '';
+
+            // Extract values from `productOrService` section, including `unitPrice` and `net`
+            if (jsonObj.productOrService) {
+                const coding = jsonObj.productOrService.coding || [];
+                const displayName = coding.length > 0 ? coding[0].display || 'Not found' : 'Not found';
+                const nphiesCode = coding.length > 0 ? coding[0].code || 'Not found' : 'Not found';
+                const serviceCode = coding.length > 1 ? coding[1].code || 'Not found' : 'Not found';
+
+                const unitPrice = jsonObj.unitPrice?.value || 'Not found';
+                const net = jsonObj.net?.value || 'Not found';
+
+                output += `<br>Product/Service:<br>`;
+                output += `Name: ${displayName}<br>`;
+                output += `Nphies Code: ${nphiesCode}<br>`;
+                output += `Service Code: ${serviceCode}<br>`;
+                output += `Unit Price: ${unitPrice}<br>`;
+                output += `Net: ${net}<br>`;
+            }
+
+            // Extract values directly from JSON structure
+            const servicedDate = jsonObj.servicedDate || 'Not found';
+            const quantity = jsonObj.quantity?.value || 'Not found';
+            output += `Serviced Date: ${servicedDate}<br>`;
+            output += `Quantity: ${quantity}<br>`;
+
+            // Extract values from the `extension` array
+            const extension = jsonObj.extension || [];
+            let extensionTax = 'Not found';
+            let patientShare = 'Not found';
+            let patientInvoice = 'Not found';
+
+            extension.forEach(ext => {
+                if (ext.url && ext.url.includes("extension-tax")) {
+                    extensionTax = ext.valueMoney?.value || 'Not found';
+                }
+                if (ext.url && ext.url.includes("extension-patient-share")) {
+                    patientShare = ext.valueMoney?.value || 'Not found';
+                }
+                if (ext.url && ext.url.includes("extension-patientInvoice")) {
+                    patientInvoice = ext.valueIdentifier?.value || 'Not found';
+                }
+            });
+
+            output += `Extension Tax: ${extensionTax}<br>`;
+            output += `Patient Share: ${patientShare}<br>`;
+            output += `Patient Invoice: ${patientInvoice}<br>`;
+
+            document.getElementById('outputBox').innerHTML = output;
         }
     </script>
 </body>
