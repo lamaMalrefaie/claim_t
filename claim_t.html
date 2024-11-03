@@ -126,11 +126,19 @@
                 var jsonObj = JSON.parse(inputText);
                 var prettyJson = JSON.stringify(jsonObj, null, 2);
                 document.getElementById('beutiBox').value = prettyJson;
-                searchJson(jsonObj);
+
+                if (jsonObj.fullUrl && jsonObj.fullUrl.includes("https://Bupa.com.sa/MessageHeader")) {
+                    var match = jsonObj.fullUrl.match(/https:\/\/(\w+)\.com\.sa\/MessageHeader/);
+                    if (match && match[1] != "Bupa") {
+                        alert("Wrong response to Bupa company");
+                    }
+                }
             } catch (e) {
                 document.getElementById('beutiBox').value = 'Invalid JSON: ' + e.message;
                 document.getElementById('outputBox').innerText = '';
+                return;
             }
+            searchJson(prettyJson);
         }
 
         function clearContent() {
@@ -139,57 +147,132 @@
             document.getElementById('outputBox').innerText = '';
         }
 
-        function searchJson(jsonObj) {
-            var output = '';
+        var ServicedDatePattern = '"servicedDate":\\s*"([^"]+)"'; 
 
-            // Extract values from `productOrService` section, including `unitPrice` and `net`
-            if (jsonObj.productOrService) {
-                const coding = jsonObj.productOrService.coding || [];
-                const displayName = coding.length > 0 ? coding[0].display || 'Not found' : 'Not found';
-                const nphiesCode = coding.length > 0 ? coding[0].code || 'Not found' : 'Not found';
-                const serviceCode = coding.length > 1 ? coding[1].code || 'Not found' : 'Not found';
+        function searchJson(prettyJsonText) {
+            try {
+                var jsonObj = JSON.parse(prettyJsonText);
+                var searchPatterns = {
+                    'resourceType': '"eventCoding":\\s*{\\s*"system":\\s*"[^"]*",\\s*"code":\\s*"([^"]+)"',
+                    'Bundle ID': '"Bundle"[\\s\\S]*?"id":\\s*"([^"]+)"',
+                    'Claim Type': '/CodeSystem/claim-type"[\\s\\S]*?"code":\\s*"([^"]+)"',
+                    'Claim Sub-type': '/CodeSystem/claim-subtype"[\\s\\S]*?"code":\\s*"([^"]+)"',
+                    'Member ID': '/memberid"[\\s\\S]*?"value":\\s*"([^"]+)"',
+                    'National or Iqama ID': '(?:nphies\\.sa/identifier/nationalid|sa/identifier/iqama)"[\\s\\S]*?"value":\\s*"([\\d]+)"',
+                    'Organization ID': '.sa/license/provider-license"[\\s\\S]*?"value":\\s*"([^"]+)"',
+                    'preAuthRef': '"preAuthRef":\\s*\\[\\s*"([^"]+)"\\s*\\]',
+                    'Gender': '"gender":\\s*"([^"]+)"',
+                    'Extension Episode': '"url":\\s*"http://nphies.sa/fhir/ksa/nphies-fs/StructureDefinition/extension-episode"[\\s\\S]*?"value":\\s*"([^"]+)"',
+                    'Practitioner License': '"system":\\s*"http://nphies.sa/license/practitioner-license",\\s*"value":\\s*"([^"]+)"',
+                    'Accounting Period Value Date': '"url":\\s*"http://nphies.sa/fhir/ksa/nphiesfs/StructureDefinition/extension-accountingPeriod"[\\s\\S]*?"valueDate":\\s*"([^"]+)"',
+                    'Specialty Code': '"specialty":\\s*\\[[\\s\\S]*?"code":\\s*"([^"]+)"',
+                    'Timestamp': '"timestamp":\\s*"([^"]+)"',
+                    'Practitioner Name': '"system":\\s*"http://nphies.sa/license/practitioner-license"[\\s\\S]*?"name"\\s*:\\s*\\[\\s*{\\s*"text"\\s*:\\s*"([^"]+)"',
+                    'Claim ID': '"system":\\s*"http://sghj.com/claim",\\s*"value":\\s*"([^"]+)"', 
+                    'Patient Name': '"name":\\s*\\[[\\s\\S]*?"text":\\s*"([^"]+)"',
+                    'ICD-10 Code (Sequence 1)': '"diagnosisCodeableConcept":\\s*{[\\s\\S]*?"system":\\s*"http://hl7.org/fhir/sid/icd-10-am",[\\s\\S]*?"code":\\s*"([^"]+)"[\\s\\S]*?"sequence":\\s*1',
+                    'Diagnosis Type (Sequence 1)': '"type":\\s*\\[[\\s\\S]*?"system":\\s*"http://nphies.sa/terminology/CodeSystem/diagnosis-type",[\\s\\S]*?"code":\\s*"([^"]+)"[\\s\\S]*?"sequence":\\s*1'
+                };
 
-                const unitPrice = jsonObj.unitPrice?.value || 'Not found';
-                const net = jsonObj.net?.value || 'Not found';
+                var results = '';
+                var errorMessages = [];
+                var licensePattern = '"system":\\s*"http://nphies.sa/license/payer-license",\\s*"value":\\s*"([^"]+)"';
+                var licenseMatch = prettyJsonText.match(new RegExp(licensePattern, 'i'));
+                if (licenseMatch && licenseMatch[1] !== '7001571327') {
+                    errorMessages.push('It is not Bupa License');
+                }
 
-                output += `<br>Product/Service:<br>`;
-                output += `Name: ${displayName}<br>`;
-                output += `Nphies Code: ${nphiesCode}<br>`;
-                output += `Service Code: ${serviceCode}<br>`;
-                output += `Unit Price: ${unitPrice}<br>`;
-                output += `Net: ${net}<br>`;
+                for (var key in searchPatterns) {
+                    var regex = new RegExp(searchPatterns[key], 'i');
+                    var match = prettyJsonText.match(regex);
+                    var value = match && match[1];
+                    if (value) {
+                        results += key + ': ' + copyButton(value) + '<br>';
+                    } else {
+                        results += key + ': Not found<br>';
+                    }
+                }
+
+                if (errorMessages.length > 0) {
+                    alert(errorMessages.join('\n'));
+                }
+
+                document.getElementById('outputBox').innerHTML = results;
+                processProductOrService(prettyJsonText, results);
+            } catch (e) {
+                document.getElementById('outputBox').innerText = 'Error parsing JSON: ' + e.message;
             }
 
-            // Extract values directly from JSON structure
-            const servicedDate = jsonObj.servicedDate || 'Not found';
-            const quantity = jsonObj.quantity?.value || 'Not found';
-            output += `Serviced Date: ${servicedDate}<br>`;
-            output += `Quantity: ${quantity}<br>`;
+            processProductOrService(prettyJsonText, results);
+        }
 
-            // Extract values from the `extension` array
-            const extension = jsonObj.extension || [];
-            let extensionTax = 'Not found';
-            let patientShare = 'Not found';
-            let patientInvoice = 'Not found';
+        function processProductOrService(prettyJsonText, previousResults) {
+            var servicePattern = '"productOrService":\\s*{[\\s\\S]+?},[\\s\\S]*?"quantity":\\s*{\\s*"value":\\s*(\\d+)';
+            var serviceResults = '';
+            var serviceMatches = prettyJsonText.match(new RegExp(servicePattern, 'gi'));
 
-            extension.forEach(ext => {
-                if (ext.url && ext.url.includes("extension-tax")) {
-                    extensionTax = ext.valueMoney?.value || 'Not found';
+            var patientInvoicePattern = '"system":\\s*"[^"]*patientInvoice"\\s*,\\s*"value":\\s*"([^"]+)"';
+            var patientInvoiceMatch = prettyJsonText.match(new RegExp(patientInvoicePattern, 'i'));
+            var patientInvoiceValue = patientInvoiceMatch ? patientInvoiceMatch[1] : 'Not found';
+
+            if (serviceMatches) {
+                for (var i = 0; i < serviceMatches.length; i++) {
+                    var currentMatch = serviceMatches[i];
+                    var displayPattern = '"display":\\s*"([^"]+)"';
+                    var NphiesPattern = '"coding":\\s*\\[\\s*{[\\s\\S]+?"system":\\s*"([^"]+)",\\s*"code":\\s*"([^"]+)"';
+                    var ServicePattern = '"coding":\\s*\\[\\s*{[\\s\\S]+?},\\s*{[\\s\\S]+?"system":\\s*"([^"]+)",\\s*"code":\\s*"([^"]+)"';
+                    var unitPricePattern = '"unitPrice":\\s*{\\s*"value":\\s*([\\d.]+)'; // New unitPrice pattern
+                    var netPattern = '"net":\\s*{\\s*"value":\\s*([\\d.]+)'; // New net pattern
+                    var extensionTaxPattern = '"url":\\s*"[^"]*extension-tax"[\\s\\S]*?"valueMoney":\\s*{\\s*"value":\\s*([\\d.]+)'; // extension-tax
+                    var patientSharePattern = '"url":\\s*"[^"]*patient-share"[\\s\\S]*?"valueMoney":\\s*{\\s*"value":\\s*([\\d.]+)'; // patient-share
+
+                    var displayMatch = currentMatch.match(new RegExp(displayPattern, 'i'));
+                    var NphiesMatch = currentMatch.match(new RegExp(NphiesPattern, 'i'));
+                    var ServiceMatch = currentMatch.match(new RegExp(ServicePattern, 'i'));
+                    var unitPriceMatch = currentMatch.match(new RegExp(unitPricePattern, 'i'));
+                    var netMatch = currentMatch.match(new RegExp(netPattern, 'i'));
+                    var extensionTaxMatch = currentMatch.match(new RegExp(extensionTaxPattern, 'i'));
+                    var patientShareMatch = currentMatch.match(new RegExp(patientSharePattern, 'i'));
+
+                    var quantityMatch = currentMatch.match(new RegExp('"quantity":\\s*{\\s*"value":\\s*(\\d+)', 'i'));
+                    var ServicedDateMatch1 = currentMatch.match(new RegExp(ServicedDatePattern, 'i'));
+
+                    serviceResults += '<br>' + 'Product/Service :' + (i + 1) + ' <br>';
+                    serviceResults += 'Name: ' + (displayMatch ? displayMatch[1] : 'Not found') + '<br>';
+                    serviceResults += 'Nphies Code: ' + (NphiesMatch ? copyButton(NphiesMatch[2]) : 'Not found') + '<br>';
+                    serviceResults += 'Service Code: ' + (ServiceMatch ? copyButton(ServiceMatch[2]) : 'Not found') + '<br>';
+                    serviceResults += 'Patient Invoice: ' + (patientInvoiceValue !== 'Not found' ? copyButton(patientInvoiceValue) : 'Not found') + '<br>';
+                    serviceResults += 'Extension Tax: ' + (extensionTaxMatch ? copyButton(extensionTaxMatch[1]) : 'Not found') + '<br>';
+                    serviceResults += 'Patient Share: ' + (patientShareMatch ? copyButton(patientShareMatch[1]) : 'Not found') + '<br>';
+                    serviceResults += 'Unit Price: ' + (unitPriceMatch ? copyButton(unitPriceMatch[1]) : 'Not found') + '<br>';
+                    serviceResults += 'Net: ' + (netMatch ? copyButton(netMatch[1]) : 'Not found') + '<br>';
+
+                    if (ServicedDateMatch1) {
+                        serviceResults += 'Serviced Date: ' + copyButton(ServicedDateMatch1[1]) + '<br>';
+                    } else {
+                        serviceResults += 'Serviced Date: Not found<br>';
+                    }
+
+                    serviceResults += 'Quantity: ' + (quantityMatch ? quantityMatch[1] : 'Not found') + '<br><br>';
                 }
-                if (ext.url && ext.url.includes("extension-patient-share")) {
-                    patientShare = ext.valueMoney?.value || 'Not found';
-                }
-                if (ext.url && ext.url.includes("extension-patientInvoice")) {
-                    patientInvoice = ext.valueIdentifier?.value || 'Not found';
-                }
-            });
+            }
 
-            output += `Extension Tax: ${extensionTax}<br>`;
-            output += `Patient Share: ${patientShare}<br>`;
-            output += `Patient Invoice: ${patientInvoice}<br>`;
+            document.getElementById('outputBox').innerHTML = previousResults + serviceResults;
+        }
 
-            document.getElementById('outputBox').innerHTML = output;
+        function copyButton(text) {
+            return '<span style="cursor: pointer; text-decoration: underline;" onclick="copyToClipboard(\'' + text + '\')">' + text + '</span>';
+        }
+
+        function copyToClipboard(text) {
+            var dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            alert('Copied: ' + text);
         }
     </script>
-</body>
+</body> 
 </html>
