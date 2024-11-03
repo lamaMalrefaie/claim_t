@@ -282,55 +282,67 @@
         }
 
         function processProductOrService(prettyJsonText, previousResults) {
-            var servicePattern = '"productOrService":\\s*{[\\s\\S]+?},[\\s\\S]*?"quantity":\\s*{\\s*"value":\\s*(\\d+)';
-            var serviceResults = '';
-            var serviceMatches = prettyJsonText.match(new RegExp(servicePattern, 'gi'));
+            try {
+                // Parse the JSON text into an object
+                var jsonObj = JSON.parse(prettyJsonText);
+                
+                // Check if the JSON object contains services in an array format
+                var services = Array.isArray(jsonObj) ? jsonObj : [jsonObj];
+                var serviceResults = '';
 
-            var patientInvoicePattern = '"system":\\s*"[^"]*patientInvoice"\\s*,\\s*"value":\\s*"([^"]+)"';
-            var patientInvoiceMatch = prettyJsonText.match(new RegExp(patientInvoicePattern, 'i'));
-            var patientInvoiceValue = patientInvoiceMatch ? patientInvoiceMatch[1] : 'Not found';
+                services.forEach((service, index) => {
+                    var display = service.display || 'Not found';
+                    var nphiesCode = service.coding?.[0]?.code || 'Not found';
+                    var serviceCode = service.coding?.[1]?.code || 'Not found';
+                    var patientInvoice = service.patientInvoice?.value || 'Not found';
 
-            if (serviceMatches) {
-                for (var i = 0; i < serviceMatches.length; i++) {
-                    var currentMatch = serviceMatches[i];
-                    var displayPattern = '"display":\\s*"([^"]+)"';
-                    var NphiesPattern = '"coding":\\s*\\[\\s*{[\\s\\S]+?"system":\\s*"([^"]+)",\\s*"code":\\s*"([^"]+)"';
-                    var ServicePattern = '"coding":\\s*\\[\\s*{[\\s\\S]+?},\\s*{[\\s\\S]+?"system":\\s*"([^"]+)",\\s*"code":\\s*"([^"]+)"';
-                    var extensionTaxPattern = '"url":\\s*"[^"]*extension-tax"[\\s\\S]*?"valueMoney":\\s*{\\s*"value":\\s*([\\d.]+)'; // Corrected pattern for extension-tax
-                    var patientSharePattern = '"url":\\s*"[^"]*patient-share"[\\s\\S]*?"valueMoney":\\s*{\\s*"value":\\s*([\\d.]+)'; // Corrected pattern for patient-share
-                    var netPattern = '"net":\\s*{\\s*"value":\\s*([\\d.]+)'; // Corrected pattern for net
-                    var unitPricePattern = '"unitPrice":\\s*{\\s*"value":\\s*([\\d.]+)'; // Corrected pattern for unitPrice
-                    var quantityPattern = '"quantity":\\s*{\\s*"value":\\s*(\\d+)';
-                    var servicedDatePattern = '"servicedDate":\\s*"([^"]+)"';
+                    // Extract extension-tax
+                    var extensionTax = 'Not found';
+                    var extension = service.extension || [];
+                    extension.forEach(ext => {
+                        if (ext.url && ext.url.includes("extension-tax")) {
+                            extensionTax = ext.valueMoney?.value || 'Not found';
+                        }
+                    });
 
-                    var displayMatch = currentMatch.match(new RegExp(displayPattern, 'i'));
-                    var NphiesMatch = currentMatch.match(new RegExp(NphiesPattern, 'i'));
-                    var ServiceMatch = currentMatch.match(new RegExp(ServicePattern, 'i'));
-                    var extensionTaxMatch = currentMatch.match(new RegExp(extensionTaxPattern, 'i'));
-                    var patientShareMatch = currentMatch.match(new RegExp(patientSharePattern, 'i'));
-                    var netMatch = currentMatch.match(new RegExp(netPattern, 'i'));
-                    var unitPriceMatch = currentMatch.match(new RegExp(unitPricePattern, 'i'));
-                    var quantityMatch = currentMatch.match(new RegExp(quantityPattern, 'i'));
-                    var servicedDateMatch = currentMatch.match(new RegExp(servicedDatePattern, 'i'));
+                    // Extract patient-share
+                    var patientShare = 'Not found';
+                    extension.forEach(ext => {
+                        if (ext.url && ext.url.includes("patient-share")) {
+                            patientShare = ext.valueMoney?.value || 'Not found';
+                        }
+                    });
+
+                    // Extract net
+                    var net = service.net?.value || 'Not found';
+
+                    // Extract unitPrice
+                    var unitPrice = service.unitPrice?.value || 'Not found';
+
+                    // Extract servicedDate and quantity
+                    var servicedDate = service.servicedDate || 'Not found';
+                    var quantity = service.quantity?.value || 'Not found';
 
                     // Compile all extracted information into a single package for each service
-                    serviceResults += '<br>' + 'Product/Service :' + (i + 1) + ' <br>';
-                    serviceResults += 'Name: ' + (displayMatch ? displayMatch[1] : 'Not found') + '<br>';
-                    serviceResults += 'Nphies Code: ' + (NphiesMatch ? copyButton(NphiesMatch[2]) : 'Not found') + '<br>';
-                    serviceResults += 'Service Code: ' + (ServiceMatch ? copyButton(ServiceMatch[2]) : 'Not found') + '<br>';
-                    serviceResults += 'Patient Invoice: ' + (patientInvoiceValue !== 'Not found' ? copyButton(patientInvoiceValue) : 'Not found') + '<br>';
-                    serviceResults += 'Extension Tax: ' + (extensionTaxMatch ? copyButton(extensionTaxMatch[1]) : 'Not found') + '<br>';
-                    serviceResults += 'Patient Share: ' + (patientShareMatch ? copyButton(patientShareMatch[1]) : 'Not found') + '<br>';
-                    serviceResults += 'Net: ' + (netMatch ? copyButton(netMatch[1]) : 'Not found') + '<br>';
-                    serviceResults += 'Unit Price: ' + (unitPriceMatch ? copyButton(unitPriceMatch[1]) : 'Not found') + '<br>';
-                    serviceResults += 'Serviced Date: ' + (servicedDateMatch ? copyButton(servicedDateMatch[1]) : 'Not found') + '<br>';
-                    serviceResults += 'Quantity: ' + (quantityMatch ? quantityMatch[1] : 'Not found') + '<br><br>';
-                }
+                    serviceResults += `<br>Product/Service ${index + 1} <br>`;
+                    serviceResults += `Name: ${display}<br>`;
+                    serviceResults += `Nphies Code: ${nphiesCode}<br>`;
+                    serviceResults += `Service Code: ${serviceCode}<br>`;
+                    serviceResults += `Patient Invoice: ${patientInvoice}<br>`;
+                    serviceResults += `Extension Tax: ${extensionTax}<br>`;
+                    serviceResults += `Patient Share: ${patientShare}<br>`;
+                    serviceResults += `Net: ${net}<br>`;
+                    serviceResults += `Unit Price: ${unitPrice}<br>`;
+                    serviceResults += `Serviced Date: ${servicedDate}<br>`;
+                    serviceResults += `Quantity: ${quantity}<br><br>`;
+                });
+
+                document.getElementById('outputBox').innerHTML = previousResults + serviceResults;
+
+            } catch (e) {
+                document.getElementById('outputBox').innerHTML = 'Error parsing JSON: ' + e.message;
             }
-
-            document.getElementById('outputBox').innerHTML = previousResults + serviceResults;
         }
-
 
 
 
